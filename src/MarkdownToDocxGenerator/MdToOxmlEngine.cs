@@ -23,8 +23,6 @@ namespace MarkdownToDocxGenerator
     {
         private readonly ILogger logger;
 
-        private string rootFolder;
-
         public MdToOxmlEngine(ILogger<MdToOxmlEngine> logger)
         {
             this.logger = logger;
@@ -51,8 +49,6 @@ namespace MarkdownToDocxGenerator
         public Report Transform(string fileContent, 
                                 string rootFolder)
         {
-            this.rootFolder = rootFolder;
-
             var result = new Report()
             {
                 ContextModel = new ContextModel(),
@@ -75,7 +71,7 @@ namespace MarkdownToDocxGenerator
                     // Add title :
                     var mdHead = (HeadingBlock)block;
 
-                    var elements = GetContainerInlineText(mdHead.Inline);
+                    var elements = GetContainerInlineText(mdHead.Inline, rootFolder);
                     var paragraph = elements.OfType<Paragraph>().FirstOrDefault();
                     paragraph.ParagraphStyleId = GetTitleStyle(mdHead.Level);
                     // Now we will delete label styles :
@@ -90,7 +86,7 @@ namespace MarkdownToDocxGenerator
                 {
                     var mdParagraph = (ParagraphBlock)block;
 
-                    var elements = GetContainerInlineText(mdParagraph.Inline);
+                    var elements = GetContainerInlineText(mdParagraph.Inline, rootFolder);
                     currentPage.ChildElements.AddRange(elements);
                 }
                 else if (blockType == typeof(FencedCodeBlock))
@@ -103,7 +99,7 @@ namespace MarkdownToDocxGenerator
                 else if (blockType == typeof(ListBlock))
                 {
                     var mdListBlock = (ListBlock)block;
-                    var paragraphs = GetListBlock(mdListBlock);
+                    var paragraphs = GetListBlock(mdListBlock, rootFolder);
                     currentPage.ChildElements.AddRange(paragraphs);
                 }
                 else if (blockType == typeof(LinkReferenceDefinitionGroup))
@@ -122,7 +118,7 @@ namespace MarkdownToDocxGenerator
                 else if (blockType == typeof(Markdig.Extensions.Tables.Table))
                 {
                     var mdtable = (Markdig.Extensions.Tables.Table)block;
-                    var table = GetTable(mdtable);
+                    var table = GetTable(mdtable, rootFolder);
                     currentPage.ChildElements.Add(table);
                 }
                 else
@@ -144,7 +140,7 @@ namespace MarkdownToDocxGenerator
             return $"Titre{level}";
         }
 
-        private List<BaseElement> GetListBlock(ListBlock block)
+        private List<BaseElement> GetListBlock(ListBlock block, string rootFolder)
         {
             var result = new List<BaseElement>();
             var count = 1;
@@ -158,7 +154,7 @@ namespace MarkdownToDocxGenerator
                         prefix = count.ToString() + ".";
                     else
                         prefix = block.BulletType.ToString();
-                    var elements = GetContainerInlineText(((ParagraphBlock)mdBlock.LastChild).Inline, prefix + " ");
+                    var elements = GetContainerInlineText(((ParagraphBlock)mdBlock.LastChild).Inline, rootFolder, prefix + " ");
                     result.AddRange(elements);
                 }
                 count++;
@@ -212,7 +208,7 @@ namespace MarkdownToDocxGenerator
             return result;
         }
 
-        private List<BaseElement> GetContainerInlineText(ContainerInline containerBlock, string labelPrefix = "")
+        private List<BaseElement> GetContainerInlineText(ContainerInline containerBlock, string rootFolder, string labelPrefix = "")
         {
             var result = new List<BaseElement>();
 
@@ -256,7 +252,7 @@ namespace MarkdownToDocxGenerator
                         else if (subBlockType == typeof(LinkInline))
                         {
                             var mdLinkInline = (LinkInline)subBlock;
-                            var hyperlink = GetLinkInlineText(mdLinkInline);
+                            var hyperlink = GetLinkInlineText(mdLinkInline, rootFolder);
                             if (hyperlink != null)
                                 paragraph.ChildElements.Add(hyperlink);
                         }
@@ -277,7 +273,7 @@ namespace MarkdownToDocxGenerator
                         result.Add(paragraph);
                     }
                     var mdLinkInline = (LinkInline)inlineBlock;
-                    var hyperlink = GetLinkInlineText(mdLinkInline);
+                    var hyperlink = GetLinkInlineText(mdLinkInline, rootFolder);
                     if (hyperlink != null)
                         paragraph.ChildElements.Add(hyperlink);
                 }
@@ -316,9 +312,9 @@ namespace MarkdownToDocxGenerator
             return result;
         }
 
-        private Table GetTable(Markdig.Extensions.Tables.Table table)
+        private Table GetTable(Markdig.Extensions.Tables.Table table, string rootFolder)
         {
-            var cells = GetCells(table);
+            var cells = GetCells(table, rootFolder);
 
             return GenerateTable(cells);
         }
@@ -432,7 +428,7 @@ namespace MarkdownToDocxGenerator
             return cells;
         }
 
-        private List<List<Cell>> GetCells(Markdig.Extensions.Tables.Table table)
+        private List<List<Cell>> GetCells(Markdig.Extensions.Tables.Table table, string rootFolder)
         {
             List<List<Cell>> cells = new List<List<Cell>>();
 
@@ -446,7 +442,7 @@ namespace MarkdownToDocxGenerator
 
                     if (mdParagraph != null)
                     {
-                        var elements = GetContainerInlineText(mdParagraph.Inline);
+                        var elements = GetContainerInlineText(mdParagraph.Inline, rootFolder);
                         var cell = new Cell
                         {
                             Margin = new MarginModel { Left = 100 },
@@ -534,7 +530,7 @@ namespace MarkdownToDocxGenerator
             return result;
         }
 
-        private BaseElement GetLinkInlineText(LinkInline containerBlock)
+        private BaseElement GetLinkInlineText(LinkInline containerBlock, string rootFolder)
         {
             if (containerBlock.IsImage)
             {
