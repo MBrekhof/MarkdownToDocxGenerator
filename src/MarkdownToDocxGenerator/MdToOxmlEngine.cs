@@ -78,11 +78,14 @@ namespace MarkdownToDocxGenerator
                     var elements = GetContainerInlineText(mdHead.Inline);
                     var paragraph = elements.OfType<Paragraph>().FirstOrDefault();
                     paragraph.ParagraphStyleId = GetTitleStyle(mdHead.Level);
-                    // Now we will delete label styles :
+                    // Now we will delete label styles (including any inline-code
+                    // shading/monospace) so the whole heading inherits the title style :
                     foreach (var label in paragraph.ChildElements.OfType<Label>())
                     {
                         label.FontColor = null;
                         label.FontSize = null;
+                        label.FontName = null;
+                        label.Shading = null;
                     }
                     currentPage.ChildElements.AddRange(elements);
                 }
@@ -234,6 +237,19 @@ namespace MarkdownToDocxGenerator
                     var label = GetLiteralInlineText((LiteralInline)inlineBlock, labelPrefix: labelPrefix);
                     paragraph.ChildElements.Add(label);
                 }
+                else if (blockType == typeof(CodeInline))
+                {
+                    if (paragraph is null)
+                    {
+                        paragraph = new Paragraph()
+                        {
+                            ChildElements = new List<BaseElement>()
+                        };
+                        result.Add(paragraph);
+                    }
+                    var label = GetCodeInlineLabel((CodeInline)inlineBlock);
+                    paragraph.ChildElements.Add(label);
+                }
                 else if (blockType == typeof(EmphasisInline))
                 {
                     if (paragraph is null)
@@ -251,6 +267,11 @@ namespace MarkdownToDocxGenerator
                         if (subBlockType == typeof(LiteralInline))
                         {
                             var label = GetLiteralInlineText((LiteralInline)subBlock, mdEmphasisInline.DelimiterChar == '*' && mdEmphasisInline.DelimiterCount == 2);
+                            paragraph.ChildElements.Add(label);
+                        }
+                        else if (subBlockType == typeof(CodeInline))
+                        {
+                            var label = GetCodeInlineLabel((CodeInline)subBlock);
                             paragraph.ChildElements.Add(label);
                         }
                         else if (subBlockType == typeof(LinkInline))
@@ -534,6 +555,23 @@ namespace MarkdownToDocxGenerator
             return result;
         }
 
+        /// <summary>
+        /// Render an inline <c>`code`</c> span as a monospace, lightly shaded label so
+        /// its content (which may contain markdown-significant characters such as
+        /// apostrophes or pipes) is preserved verbatim rather than dropped.
+        /// </summary>
+        private Label GetCodeInlineLabel(CodeInline codeInline)
+        {
+            return new Label()
+            {
+                Text = codeInline.Content,
+                FontSize = "20",
+                FontName = "Consolas",
+                Shading = "EAEAEA",
+                SpaceProcessingModeValue = SpaceProcessingModeValues.Preserve
+            };
+        }
+
         private BaseElement GetLinkInlineText(LinkInline containerBlock)
         {
             if (containerBlock.IsImage)
@@ -599,14 +637,27 @@ namespace MarkdownToDocxGenerator
                     ChildElements = new List<BaseElement>()
                 };
 
-                if (containerBlock.FirstChild.GetType() == typeof(LiteralInline))
+                var underline = new UnderlineModel
+                {
+                    Color = "40A6DB",
+                    Val = UnderlineValues.Single
+                };
+
+                if (containerBlock.FirstChild == null)
+                {
+                    logger.LogInformation($"Empty link text for {containerBlock.Url}. Skipping hyperlink.");
+                    return null;
+                }
+                else if (containerBlock.FirstChild.GetType() == typeof(LiteralInline))
                 {
                     var label = GetLiteralInlineText((LiteralInline)containerBlock.FirstChild);
-                    label.Underline = new UnderlineModel
-                    {
-                        Color = "40A6DB",
-                        Val = UnderlineValues.Single
-                    };
+                    label.Underline = underline;
+                    hyperlink.Text = label;
+                }
+                else if (containerBlock.FirstChild.GetType() == typeof(CodeInline))
+                {
+                    var label = GetCodeInlineLabel((CodeInline)containerBlock.FirstChild);
+                    label.Underline = underline;
                     hyperlink.Text = label;
                 }
                 else
