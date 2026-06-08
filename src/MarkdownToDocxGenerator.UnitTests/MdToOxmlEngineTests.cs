@@ -42,7 +42,7 @@ namespace MarkdownToDocxGenerator.UnitTests
             var report = CreateEngine().Transform("**bold words**", "");
 
             var label = Labels(FirstPage(report)).Single(l => l.Text == "bold words");
-            Assert.AreEqual(true, label.Bold);
+            Assert.IsTrue(label.Bold!.Value);
         }
 
         [TestMethod]
@@ -52,7 +52,7 @@ namespace MarkdownToDocxGenerator.UnitTests
 
             var label = Labels(FirstPage(report)).First();
             Assert.AreEqual("Just some text", label.Text);
-            Assert.AreEqual(false, label.Bold);
+            Assert.IsFalse(label.Bold!.Value);
         }
 
         [TestMethod]
@@ -67,7 +67,7 @@ namespace MarkdownToDocxGenerator.UnitTests
                 .Where(p => p.Shading == "EAEAEA")
                 .ToList();
 
-            Assert.IsTrue(codeParagraphs.Count >= 1, "expected at least one shaded code paragraph");
+            Assert.IsGreaterThanOrEqualTo(1, codeParagraphs.Count, "expected at least one shaded code paragraph");
             Assert.IsTrue(
                 codeParagraphs.SelectMany(p => p.ChildElements.OfType<Label>()).Any(l => l.Text.Contains("var x = 1;")),
                 "code text should be preserved in a shaded paragraph");
@@ -81,8 +81,8 @@ namespace MarkdownToDocxGenerator.UnitTests
             var report = CreateEngine().Transform(markdown, "");
 
             var table = FirstPage(report).ChildElements.OfType<Table>().Single();
-            Assert.AreEqual(2, table.HeaderRow.Cells.Count, "header should have two columns");
-            Assert.AreEqual(2, table.Rows.Count, "two data rows expected (header excluded)");
+            Assert.HasCount(2, table.HeaderRow.Cells, "header should have two columns");
+            Assert.HasCount(2, table.Rows, "two data rows expected (header excluded)");
         }
 
         [TestMethod]
@@ -109,8 +109,102 @@ namespace MarkdownToDocxGenerator.UnitTests
             var hyperlinks = paragraphs.SelectMany(p => p.ChildElements.OfType<Hyperlink>()).ToList();
             var labels = paragraphs.SelectMany(p => p.ChildElements.OfType<Label>()).ToList();
 
-            Assert.AreEqual(0, hyperlinks.Count, "relative URLs must not become hyperlinks");
+            Assert.IsEmpty(hyperlinks, "relative URLs must not become hyperlinks");
             Assert.IsTrue(labels.Any(l => l.Text == "see file"), "link text should survive as a plain label");
+        }
+
+        [TestMethod]
+        public void Inline_code_span_content_is_preserved_as_a_label()
+        {
+            // Regression guard: inline `code` spans were silently dropped because
+            // CodeInline had no handler, so surrounding text appeared mangled.
+            var report = CreateEngine().Transform("the `Labware8` db doesn't exist", "");
+
+            var labels = Labels(FirstPage(report)).Select(l => l.Text).ToList();
+
+            Assert.IsTrue(labels.Any(t => t == "Labware8"),
+                "inline code content must survive; got: " + string.Join(" | ", labels));
+            CollectionAssert.AreEqual(
+                new[] { "the ", "Labware8", " db doesn't exist" },
+                labels,
+                "code span should sit inline between the surrounding text");
+        }
+
+        [TestMethod]
+        public void Inline_code_with_apostrophes_is_not_dropped()
+        {
+            // The original report: apostrophes inside an inline code span looked
+            // "interpreted wrong" because the whole span vanished.
+            var report = CreateEngine().Transform("all 71 `Invalid column name 'PROGRAM'` errors", "");
+
+            var labels = Labels(FirstPage(report)).Select(l => l.Text).ToList();
+
+            // Assert the whole sequence: the original symptom was the surrounding
+            // prose looking mangled because the code span (with its apostrophes) vanished.
+            CollectionAssert.AreEqual(
+                new[] { "all 71 ", "Invalid column name 'PROGRAM'", " errors" },
+                labels,
+                "code span with apostrophes must be preserved inline; got: " + string.Join(" | ", labels));
+        }
+
+        [TestMethod]
+        public void Inline_code_nested_in_emphasis_is_preserved()
+        {
+            // The emphasis sub-loop had the same missing CodeInline case, so
+            // `code` inside **bold**/*italic* was dropped.
+            var report = CreateEngine().Transform("see **the `FN_ADD_FLAG` routine**", "");
+
+            var labels = Labels(FirstPage(report)).Select(l => l.Text).ToList();
+
+            Assert.IsTrue(labels.Any(t => t == "FN_ADD_FLAG"),
+                "code span nested in emphasis must be preserved; got: " + string.Join(" | ", labels));
+        }
+
+        [TestMethod]
+        public void Inline_code_label_is_monospace_and_shaded()
+        {
+            var report = CreateEngine().Transform("a `code` span", "");
+
+            var codeLabel = Labels(FirstPage(report)).Single(l => l.Text == "code");
+            Assert.AreEqual("Consolas", codeLabel.FontName);
+            Assert.AreEqual("EAEAEA", codeLabel.Shading);
+        }
+
+        [TestMethod]
+        public void Heading_inline_code_inherits_title_style()
+        {
+            // Inline code in a heading must not carry a shaded monospace box;
+            // it should inherit the title style like the rest of the heading.
+            var report = CreateEngine().Transform("# Title with `code` here", "");
+
+            var codeLabel = Labels(FirstPage(report)).Single(l => l.Text == "code");
+            Assert.IsNull(codeLabel.Shading, "heading code must not keep code shading");
+            Assert.IsNull(codeLabel.FontName, "heading code must not keep monospace font");
+        }
+
+        [TestMethod]
+        public void Link_with_inline_code_label_is_preserved_as_hyperlink()
+        {
+            // Inline code as a link's text was dropped (hyperlink had null text).
+            var report = CreateEngine().Transform("[`code`](https://example.com)", "");
+
+            var hyperlink = FirstPage(report).ChildElements
+                .OfType<Paragraph>()
+                .SelectMany(p => p.ChildElements.OfType<Hyperlink>())
+                .Single();
+
+            Assert.AreEqual("https://example.com", hyperlink.WebSiteUri);
+            Assert.AreEqual("code", hyperlink.Text?.Text);
+        }
+
+        [TestMethod]
+        public void Empty_absolute_link_does_not_throw()
+        {
+            // Regression guard: an empty-text absolute link `[](url)` used to
+            // throw NullReferenceException on FirstChild.
+            var report = CreateEngine().Transform("[](https://example.com)", "");
+
+            Assert.IsNotNull(report);
         }
 
         [TestMethod]
@@ -118,7 +212,7 @@ namespace MarkdownToDocxGenerator.UnitTests
         {
             var report = CreateEngine().Transform("", "");
 
-            Assert.AreEqual(0, FirstPage(report).ChildElements.Count);
+            Assert.IsEmpty(FirstPage(report).ChildElements);
         }
     }
 }

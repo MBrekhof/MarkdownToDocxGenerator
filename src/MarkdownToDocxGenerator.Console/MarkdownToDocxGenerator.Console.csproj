@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenXMLSDK.Engine" Version="2022.10313.0-preview-044" />
+    <PackageReference Include="OpenXMLSDK.Engine" Version="2022.10313.0" />
   </ItemGroup>
 
   <ItemGroup>

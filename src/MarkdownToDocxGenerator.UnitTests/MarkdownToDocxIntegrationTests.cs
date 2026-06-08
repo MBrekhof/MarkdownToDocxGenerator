@@ -58,7 +58,7 @@ namespace MarkdownToDocxGenerator.UnitTests
 
             using var stream = generator.TransformWithStream(new List<string> { "# Hello World" });
 
-            Assert.IsTrue(stream.Length > 0, "generated stream should not be empty");
+            Assert.IsGreaterThan(0, stream.Length, "generated stream should not be empty");
 
             stream.Position = 0;
             using var document = WordprocessingDocument.Open(stream, false);
