@@ -22,7 +22,7 @@ Working backlog. Newest decisions at top; check items off as done.
   - Covered by `HeadingEdgeTests` + `ReportGeneratorFileTests`. Verified on `working`: `-warnaserror` clean, **33/33 pass**.
 - [x] **Fix file-based `Transform` silently not saving without a template** — branch `fix/no-template-save` (off `main`, `origin/fix/no-template-save`), merged into `working` (`cee8082`). `WordManager.New()`/`SaveDoc()` take no path (no `SaveAs` exists), so the no-template branch wrote nothing to `outputPath` and didn't throw. Now persists `GetMemoryStream()` bytes to `outputPath` after `SaveDoc`/`CloseDoc` (mirrors `TransformWithStream`). Covered by `ReportGeneratorNoTemplateTests`. Verified on `working`: `-warnaserror` clean, **34/34 pass**.
 - [ ] **Docker branch** — `origin/copilot/support-for-docker-image` is worth adopting (good Dockerfile incl. `libgdiplus`, solid GHCR workflow, compose + examples). It's 1 commit behind `main`. Plan: rebase onto `main`, open a PR, and **smoke-test the Linux image actually produces a .docx** (System.Drawing.Common + libgdiplus image embedding is the risk). Not in `working`.
-- [ ] **Delete dead branch** — `origin/copilot/propose-new-features-or-improvements` is an empty "Initial plan" commit (no changes). Delete it.
+- [x] **Delete dead branch** — `origin/copilot/propose-new-features-or-improvements` (empty "Initial plan", verified zero diff vs `main`) **deleted** on remote.
 
 ## Code / quality
 
