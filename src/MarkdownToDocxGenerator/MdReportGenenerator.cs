@@ -52,16 +52,18 @@ namespace MarkdownToDocxGenerator
 
             var culture = new CultureInfo("en-US");
 
+            var hasTemplate = !string.IsNullOrWhiteSpace(templatePath);
+
             using (var word = new WordManager())
             {
-                if (!string.IsNullOrWhiteSpace(templatePath))
+                if (hasTemplate)
                     word.OpenDocFromTemplate(templatePath, outputPath, true);
                 else
                     word.New();
 
                 // Pre hook :
                 preHook?.Invoke(word);
-                
+
                 // Append documentation :
                 word.AppendSubDocument(reports, true, culture);
 
@@ -70,6 +72,17 @@ namespace MarkdownToDocxGenerator
 
                 word.SaveDoc();
                 word.CloseDoc();
+
+                if (!hasTemplate)
+                {
+                    // New() has no associated output path, so SaveDoc() above does not
+                    // write anywhere. Persist the generated document to outputPath
+                    // explicitly (mirrors how TransformWithStream extracts the bytes).
+                    using var stream = word.GetMemoryStream();
+                    using var file = File.Create(outputPath);
+                    stream.Position = 0;
+                    stream.CopyTo(file);
+                }
             }
         }
 
