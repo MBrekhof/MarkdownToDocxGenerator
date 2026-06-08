@@ -62,9 +62,16 @@ namespace MarkdownToDocxGenerator
             var mdDocument = Markdown.Parse(fileContent, pipeline);
             var currentPage = new Page();
 
+            // Markdig collapses runs of blank lines between blocks, but each block keeps
+            // the source line it starts on, so we can re-insert the extra blank lines.
+            var sourceLines = fileContent.Split('\n');
+
             for (int i = 0; i < mdDocument.Count; i++)
             {
                 var block = mdDocument[i];
+
+                AppendPreservedBlankLines(currentPage, block, sourceLines);
+
                 var blockType = block.GetType();
                 if (blockType == typeof(HeadingBlock))
                 {
@@ -141,6 +148,38 @@ namespace MarkdownToDocxGenerator
         private string GetTitleStyle(int level)
         {
             return $"Titre{level}";
+        }
+
+        /// <summary>
+        /// Re-inserts intentional blank lines that the user put between top-level blocks.
+        /// One blank line is the normal paragraph separator and is rendered implicitly by
+        /// the next paragraph; only the additional blank lines become empty paragraphs.
+        /// </summary>
+        private void AppendPreservedBlankLines(Page page, Block block, string[] sourceLines)
+        {
+            var blankLinesAbove = 0;
+            var line = block.Line - 1;
+            while (line >= 0 && line < sourceLines.Length && string.IsNullOrWhiteSpace(sourceLines[line]))
+            {
+                blankLinesAbove++;
+                line--;
+            }
+
+            for (var i = 0; i < blankLinesAbove - 1; i++)
+            {
+                page.ChildElements.Add(new Paragraph()
+                {
+                    ChildElements = new List<BaseElement>()
+                    {
+                        new Label()
+                        {
+                            Text = "",
+                            FontSize = "20",
+                            SpaceProcessingModeValue = SpaceProcessingModeValues.Preserve
+                        }
+                    }
+                });
+            }
         }
 
         private List<BaseElement> GetListBlock(ListBlock block, string rootFolder)
@@ -300,21 +339,11 @@ namespace MarkdownToDocxGenerator
                 }
                 else if (blockType == typeof(LineBreakInline))
                 {
-                    if (paragraph is null)
-                    {
-                        paragraph = new Paragraph()
-                        {
-                            ChildElements = new List<BaseElement>()
-                        };
-                        result.Add(paragraph);
-                    }
-                    var breakLineLabel = new Label()
-                    {
-                        Text = "",
-                        FontSize = "20",
-                        SpaceProcessingModeValue = SpaceProcessingModeValues.Preserve
-                    };
-                    paragraph.ChildElements.Add(breakLineLabel);
+                    // A hard line break (soft breaks are promoted to hard breaks by the
+                    // pipeline) starts a new paragraph. OpenXMLSDK.Engine has no <w:br/>
+                    // model element, and the previous empty Label produced no visible
+                    // break at all, so the lines ran together. Mirrors the table branch.
+                    paragraph = null;
                 }
                 else if (blockType == typeof(PipeTableDelimiterInline))
                 {
