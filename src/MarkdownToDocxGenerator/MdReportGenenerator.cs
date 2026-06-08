@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace MarkdownToDocxGenerator
 {
@@ -37,13 +38,16 @@ namespace MarkdownToDocxGenerator
         {
             var reports = new List<Report>();
 
-            foreach (var filePath in Directory.GetFiles(rootFolder))
+            // Sort for deterministic page order (Directory.GetFiles order is not
+            // guaranteed, and differs across platforms) and match .md case-insensitively.
+            var markdownFiles = Directory.GetFiles(rootFolder)
+                                         .Where(filePath => filePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                                         .OrderBy(filePath => filePath, StringComparer.Ordinal);
+
+            foreach (var filePath in markdownFiles)
             {
-                if (filePath.EndsWith(".md"))
-                {
-                    var report = parser.TransformByFile(filePath, rootFolder);
-                    reports.Add(report);
-                }
+                var report = parser.TransformByFile(filePath, rootFolder);
+                reports.Add(report);
             }
 
             var culture = new CultureInfo("en-US");
