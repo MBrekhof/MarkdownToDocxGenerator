@@ -31,7 +31,7 @@ Report model  (Report → Document → Page → Paragraph/Label/Table/Hyperlink/
 
 - **`MdToOxmlEngine`** (`MdToOxmlEngine.cs`) — the heart. `Transform(string content, string rootFolder)` parses Markdown with Markdig and walks the AST, producing a `Report` (the OpenXMLSDK.Engine document model). It never touches the filesystem for output — it only builds the in-memory model. This is the most unit-testable surface.
 - **`MdReportGenenerator`** (`MdReportGenenerator.cs`) — orchestrator. Reads `.md` files from a folder (or a list of strings), calls the engine per document, then drives `WordManager` to render and save. Two entry points:
-  - `Transform(outputPath, rootFolder, templatePath?, preHook?, postHook?)` → writes a file.
+  - `Transform(outputPath, rootFolder, templatePath?, preHook?, postHook?)` → writes a file. Collects `*.md` from `rootFolder` **sorted, case-insensitively** (deterministic page order). Note: the no-template path can't honour `outputPath` (`WordManager.New()`/`SaveDoc()` take no path) — pass a `templatePath` to write to disk.
   - `TransformWithStream(List<string> contents, templateStream?, preHook?, postHook?)` → returns a `Stream` (for web/cloud, no disk).
 - **`ServiceBuilderExtensions.RegisterMarkdownToDocxGenerator(asSingleton)`** — DI registration for both `MdToOxmlEngine` and `MdReportGenenerator`. `true` = singletons, `false` = transient.
 - **`WordManager`** (from `OpenXMLSDK.Engine`, external) — the OOXML writer. Owns `New()` / `OpenDocFromTemplate(...)` / `AppendSubDocument(...)` / `SaveDoc()` / `GetMemoryStream()`.
