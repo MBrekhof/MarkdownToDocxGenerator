@@ -80,6 +80,13 @@ namespace MarkdownToDocxGenerator
 
                     var elements = GetContainerInlineText(mdHead.Inline, rootFolder);
                     var paragraph = elements.OfType<Paragraph>().FirstOrDefault();
+                    if (paragraph is null)
+                    {
+                        // Empty heading (e.g. "# ") has no inline content; emit an empty
+                        // styled paragraph so it still exists instead of throwing.
+                        paragraph = new Paragraph() { ChildElements = new List<BaseElement>() };
+                        elements.Add(paragraph);
+                    }
                     paragraph.ParagraphStyleId = GetTitleStyle(mdHead.Level);
                     // Now we will delete label styles (including any inline-code
                     // shading/monospace) so the whole heading inherits the title style :
