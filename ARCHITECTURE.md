@@ -49,6 +49,8 @@ Report model  (Report → Document → Page → Paragraph/Label/Table/Hyperlink/
 | Link, **absolute** URL | `Hyperlink { WebSiteUri }` (underlined) |
 | Link, **relative/invalid** URL | falls back to a plain `Label` (see #25) — never a broken hyperlink |
 | Image `![](path)` | `Image` resolved against `rootFolder`; optional `width=`/`height=` parsed from a trailing HTML tag |
+| Hard line break inside a paragraph (soft breaks are promoted to hard via `UseSoftlineBreakAsHardlineBreak`) | starts a **new `Paragraph`** — OpenXMLSDK.Engine has no `<w:br/>` model element, so a line break = paragraph split (not a true in-paragraph break) |
+| Extra blank lines between top-level blocks | re-inserted as empty `Paragraph`s by `AppendPreservedBlankLines` using `block.Line`; one blank line is the implicit paragraph separator, so only `(blanks − 1)` become visible empty lines |
 
 Unrecognized blocks/inlines are logged via `ILogger` and skipped (non-fatal).
 
