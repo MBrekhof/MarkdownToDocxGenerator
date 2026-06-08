@@ -15,7 +15,7 @@ namespace MarkdownToDocxGenerator.UnitTests
     [TestClass]
     public class ThreadSafetyTests
     {
-        private static Image SingleImage(Report report)
+        private static Image? SingleImage(Report report)
             => ((Page)report.Document.Pages.Single())
                 .ChildElements.OfType<Paragraph>()
                 .SelectMany(p => p.ChildElements.OfType<Image>())
