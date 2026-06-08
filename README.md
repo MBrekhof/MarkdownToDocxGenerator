@@ -85,13 +85,12 @@ This library uses the following packages:
 In your `Program.cs` or `Startup.cs`:
 
 ```csharp
-services.AddMarkdownToDocxGenerator();
-
-// Or for advanced control:
-// services.RegisterMarkdownToDocxGenerator(asSingleton: true);
+// asSingleton: true  -> services registered as singletons
+// asSingleton: false -> services registered as transient
+services.RegisterMarkdownToDocxGenerator(asSingleton: true);
 ```
 
-> **⚠️ Important**: You must register a logger (`ILogger`) before calling `AddMarkdownToDocxGenerator`.
+> **⚠️ Important**: You must register a logger (`ILogger`) before calling `RegisterMarkdownToDocxGenerator` — the generator depends on `ILogger<>`.
 
 #### 2. Inject and Use the Generator
 
